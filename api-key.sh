@@ -10,4 +10,4 @@ generate_token() {
 
 # Generate and display the token
 new_token=$(generate_token)
-echo "Generated Token: $new_token"
+echo "$new_token"
