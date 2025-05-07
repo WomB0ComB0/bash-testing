@@ -158,23 +158,6 @@ set -euo pipefail
 BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 FINAL_BACKUP_NAME="${ARCHIVE_NAME}-${BACKUP_TIMESTAMP}"
 
-# Determine the root directory where backup content is built.
-# If archiving, this is a temporary directory. If not, it's the final destination.
-if [ "$ARCHIVE" = true ]; then
-    # Create a temporary directory for building the archive content
-    # Using a temporary directory ensures partial backups don't clutter things if archiving fails
-    BACKUP_ROOT=$(mktemp -d -t "${ARCHIVE_NAME}-XXXXXXXXXX")
-    log_info "Building backup content in temporary directory: ${BACKUP_ROOT}"
-    # The actual backup directory *within* the temp root
-    BACKUP_DIR="$BACKUP_ROOT/$FINAL_BACKUP_NAME"
-else
-    # Create the final backup directory directly in the destination
-    BACKUP_DIR="$BACKUP_DEST_DIR/$FINAL_BACKUP_NAME"
-fi
-
-# Ensure the final backup directory structure exists within the root
-mkdir -p "$BACKUP_DIR"
-
 # --- Helper Functions ---
 
 log_info() {
@@ -200,6 +183,23 @@ check_command() {
         log_error "Required command '$1' not found. Please install it."
     fi
 }
+
+# Determine the root directory where backup content is built.
+# If archiving, this is a temporary directory. If not, it's the final destination.
+if [ "$ARCHIVE" = true ]; then
+    # Create a temporary directory for building the archive content
+    # Using a temporary directory ensures partial backups don't clutter things if archiving fails
+    BACKUP_ROOT=$(mktemp -d -t "${ARCHIVE_NAME}-XXXXXXXXXX")
+    log_info "Building backup content in temporary directory: ${BACKUP_ROOT}"
+    # The actual backup directory *within* the temp root
+    BACKUP_DIR="$BACKUP_ROOT/$FINAL_BACKUP_NAME"
+else
+    # Create the final backup directory directly in the destination
+    BACKUP_DIR="$BACKUP_DEST_DIR/$FINAL_BACKUP_NAME"
+fi
+
+# Ensure the final backup directory structure exists within the root
+mkdir -p "$BACKUP_DIR"
 
 # Function to perform rsync backup with excludes
 # Args: src, dest, exclude_patterns (array)
