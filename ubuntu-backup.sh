@@ -32,26 +32,111 @@ ARCHIVE_NAME="ubuntu-config-backup" # Base name for the archive file/directory
 # Example: ".bashrc" ".config/myapp" ".local/share/anotherapp"
 # Note: If you include a directory here, items in EXCLUDE_PATTERNS *within* it will be skipped.
 USER_CONFIG_RSYNC_ITEMS=(
+    # Shell configuration
     ".bashrc"
     ".profile"
     ".zshrc"
-    ".config"               # Generic config directory (apply EXCLUDE_PATTERNS)
-    ".ssh"                  # SSH configs and keys (sensitive!)
-    ".gnupg"                # GPG keys (sensitive!)
-    ".mozilla/firefox"      # Firefox profiles (apply EXCLUDE_PATTERNS) - considers all profiles
-    ".thunderbird"          # Thunderbird profiles (apply EXCLUDE_PATTERNS)
-    ".local/share/keyrings" # GNOME Keyring
+    ".bash_profile"
     ".bash_aliases"
-    ".selected_editor"
+    ".bash_history"
+    ".zsh_history"
+    ".zsh"                  # Zsh configuration directory
+    ".oh-my-zsh"            # Oh My Zsh configuration
+    ".inputrc"              # Readline configuration
+
+    # Terminal customization
     ".dircolors"
+    ".selected_editor"
+    ".screenrc"
+    ".tmux.conf"
+    ".terminfo"
+
+    # Config directories
+    ".config"               # Generic config directory (apply EXCLUDE_PATTERNS)
+    ".local/bin"            # User-installed executables
+    ".local/share/applications" # Custom .desktop files
+    ".config/autostart"     # Startup applications
+    
+    # Appearance and theming
     ".themes"               # User-installed themes (can be large, relies on excludes)
     ".icons"                # User-installed icons (can be large, relies on excludes)
     ".fonts"                # User-installed fonts
-    ".local/share/applications" # Custom .desktop files
-    ".config/autostart"     # Startup applications
-    # Add other specific directories/dotfiles you need backed up via rsync:
-    # ".vscode"             # VS Code config (relies on excludes for extensions/storage)
-    # ".gitconfig"          # Git user config file (can also add to USER_CONFIG_COPY_ITEMS)
+    ".local/share/fonts"    # Alternative font location
+    
+    # Security and credentials
+    ".ssh"                  # SSH configs and keys (sensitive!)
+    ".gnupg"                # GPG keys (sensitive!)
+    ".local/share/keyrings" # GNOME Keyring
+    ".pki"                  # Personal Key Infrastructure
+    ".authinfo"             # Authentication info
+    ".netrc"                # Network authentication info
+
+    # Development tools
+    ".vimrc"
+    ".vim"
+    ".emacs"
+    ".emacs.d"
+    ".gitconfig"
+    ".gitignore_global"
+    ".npmrc"
+    ".cargo"                # Rust cargo configuration
+    ".rustup"               # Rust toolchain configuration (consider excluding large files)
+    ".m2"                   # Maven configuration and repository
+    ".gradle"               # Gradle configuration
+    ".jupyter"              # Jupyter notebooks configuration
+    ".ipython"              # IPython configuration
+    ".vscode"               # VS Code config (relies on excludes for extensions/storage)
+    ".atom"                 # Atom editor config
+    ".config/nvim"          # Neovim config
+    
+    # Browser profiles
+    ".mozilla/firefox"      # Firefox profiles (apply EXCLUDE_PATTERNS) - considers all profiles
+    ".config/google-chrome" # Chrome profiles (can be large, relies on excludes)
+    ".config/chromium"      # Chromium profiles
+    ".config/vivaldi"       # Vivaldi browser
+    
+    # Email clients
+    ".thunderbird"          # Thunderbird profiles (apply EXCLUDE_PATTERNS)
+    ".config/evolution"     # Evolution mail client
+
+    # Password managers
+    ".config/keepassxc"     # KeePassXC
+    ".password-store"       # Pass password manager
+
+    # Chat and messaging
+    ".config/Signal"        # Signal Desktop
+    ".config/Element"       # Element/Matrix client
+    ".config/discord"       # Discord configuration (not cache)
+    ".config/telegram-desktop" # Telegram Desktop
+
+    # Media applications
+    ".config/vlc"           # VLC media player
+    ".config/mpv"           # MPV media player
+    ".ncmpcpp"              # Music player configuration
+    ".config/spotify"       # Spotify (config only, not cache)
+
+    # System tools
+    ".config/htop"          # Process viewer configuration
+    ".config/dconf"         # GNOME configuration database
+    ".config/pulse"         # PulseAudio configuration
+    ".gnome"                # GNOME specific user settings
+    ".config/systemd/user"  # User systemd services
+
+    # Virtual machines and containers
+    ".vagrant.d"            # Vagrant configuration (not boxes)
+    ".docker"               # Docker configuration (not images)
+    ".VirtualBox"           # VirtualBox configuration (not VMs)
+    ".config/libvirt"       # Libvirt configuration
+    
+    # Other applications
+    ".config/sublime-text"  # Sublime Text editor
+    ".config/inkscape"      # Inkscape
+    ".config/GIMP"          # GIMP
+    ".config/libreoffice"   # LibreOffice
+    ".config/nextcloud"     # Nextcloud client
+    ".config/remmina"       # Remote desktop client
+    ".timewarrior"          # Time tracking
+    ".taskwarrior"          # Task management
 )
 
 # List of specific user configuration FILES or SMALL DIRECTORIES to copy directly.
@@ -59,17 +144,114 @@ USER_CONFIG_RSYNC_ITEMS=(
 # Useful for individual dotfiles or small directories that don't need rsync logic.
 # Add paths line by line, separated by spaces or newlines.
 USER_CONFIG_COPY_ITEMS=(
+    # Git configuration
     ".gitconfig"
+    ".gitignore_global"
+    ".git-credentials"
+    ".gitattributes"
+    
+    # Editor configurations
     ".vimrc"
+    ".ideavimrc"
+    ".nanorc"
+    ".editorconfig"
+    
+    # Terminal configurations
     ".tmux.conf"
     ".screenrc"
+    ".inputrc"
+    ".hushlogin"
+    
+    # Display configurations
     ".Xresources"
+    ".Xdefaults"
+    ".xinitrc"
+    ".xsessionrc"
+    ".xprofile"
+    ".Xmodmap"
+    
+    # GUI configurations
     ".gtkrc-2.0"
+    ".gtkrc-3.0"
+    ".config/gtk-3.0/settings.ini"
+    ".config/gtk-4.0/settings.ini"
     ".config/mimeapps.list"
-    ".editorconfig"
-    # Add other specific dotfiles or small directories to copy:
-    # ".mycustomapprc"
-    # ".myotherconfigdir"
+    ".config/user-dirs.dirs"
+    ".config/user-dirs.locale"
+    
+    # Shell dotfiles
+    ".curlrc"
+    ".wgetrc"
+    ".gemrc"
+    ".pylintrc"
+    ".condarc"
+    ".npmrc"
+    ".yarnrc"
+    ".psqlrc"
+    ".my.cnf"
+    ".irbrc"
+    ".jshintrc"
+    ".eslintrc"
+    ".stylelintrc"
+    
+    # Application-specific files
+    ".config/htop/htoprc"
+    ".config/neofetch/config.conf"
+    ".config/bat/config"
+    ".config/ranger/rc.conf"
+    ".config/alacritty/alacritty.yml"
+    ".config/kitty/kitty.conf"
+    ".config/picom/picom.conf"
+    ".config/dunst/dunstrc"
+    ".config/rofi/config.rasi"
+    ".config/redshift.conf"
+    ".config/starship.toml"
+    ".config/zathura/zathurarc"
+    ".config/mpd/mpd.conf"
+    ".config/ncmpcpp/config"
+    
+    # Window Manager configurations
+    ".config/i3/config"
+    ".config/sway/config"
+    ".config/bspwm/bspwmrc"
+    ".config/awesome/rc.lua"
+    ".config/qtile/config.py"
+    ".config/hypr/hyprland.conf"
+    ".xmonad/xmonad.hs"
+    ".config/polybar/config"
+    
+    # Development-specific files
+    ".prettierrc"
+    ".clang-format"
+    ".rustfmt.toml"
+    ".clippy.toml"
+    ".pylintrc"
+    ".black"
+    ".scalafmt.conf"
+    ".config/nvim/init.vim"
+    ".config/nvim/init.lua"
+    ".config/Code/User/settings.json"
+    ".config/sublime-text-3/Packages/User/Preferences.sublime-settings"
+    
+    # Network configurations
+    ".netrc"
+    ".wgetrc"
+    ".ssh/config"
+    ".config/remmina/remmina.pref"
+    
+    # Email, chat, and calendar
+    ".muttrc"
+    ".config/neomutt/neomuttrc"
+    ".offlineimaprc"
+    ".msmtprc"
+    ".config/khal/config"
+    ".config/vdirsyncer/config"
+    
+    # System info/management
+    ".fehbg"
+    ".xscreensaver"
+    ".Xauthority"
+    ".config/fontconfig/fonts.conf"
 )
 
 
@@ -78,74 +260,371 @@ USER_CONFIG_COPY_ITEMS=(
 # Patterns are relative to the source directory being rsynced (e.g., if backing up .config,
 # an exclude like "*/cache/*" will match .config/app/cache).
 EXCLUDE_PATTERNS=(
+    # General cache and temporary files
     "*/.cache/*"            # Exclude all cache directories
     "*/cache/*"             # Exclude other cache directories (e.g., inside .config)
     "*.log"                 # Exclude log files
+    "*.tmp"                 # Temporary files
+    "*.temp"                # Alternative temp extension
     "*/tmp/*"               # Exclude temporary directories
+    "*/temp/*"              # Alternative temp directory name
     "*/Trash/*"             # Exclude trash directories
+    "*/Recycle.Bin/*"       # Windows-style trash
+    "*~"                    # Backup files created by editors
+    "*.bak"                 # Backup files
+    "*.swp"                 # Vim swap files
+    "*.swo"                 # Vim swap files
+    "*.swn"                 # Vim swap files
+    "*.pyc"                 # Python compiled files
+    "__pycache__"           # Python cache directories
+    "*.o"                   # Object files
+    "*.so"                  # Shared libraries
+    "*.dll"                 # Windows libraries
+    "*.dylib"               # macOS libraries
+    "*.a"                   # Static libraries
+    
+    # Browser data
+    "*/CacheStorage/*"      # Browser cache storage
+    "*/Service Worker/*"    # Service worker caches
+    "*/webappsstore.sqlite" # Web storage
+    "*/cookies.sqlite"      # Cookies database
+    "*/favicons.sqlite"     # Favicons database
+    "*/places.sqlite"       # Firefox history
+    "*/sessionstore*"       # Session data
+    "*/minidumps/*"         # Crash reports
+    "*/GPUCache/*"          # GPU cache
+    "*/ShaderCache/*"       # Shader cache
+    "*/Storage/*"           # Web storage
+    "*/IndexedDB/*"         # IndexedDB data
+    
+    # Application-specific caches
     "*/Code/User/globalStorage/*" # VS Code large storage
     "*/Code/User/workspaceStorage/*" # VS Code large storage
     "*/slack/Cache/*"       # Slack cache
     "*/discord/Cache/*"     # Discord cache
     "*/zoom/data/*"         # Zoom data (can be large)
     "*/electron/Cache/*"    # Electron app caches
+    "*/Code/Cache/*"        # VS Code cache
+    "*/Code/CachedData/*"   # VS Code cached data
+    "*/VSCode/Cache/*"      # VS Code cache (alternative location)
+    "*/Electron/Cache/*"    # Generic Electron cache
+    "*/Chromium/Default/Cache/*" # Chromium cache
+    "*/Google/Chrome/Default/Cache/*" # Chrome cache
+    "*/Firefox/Profiles/*/cache*" # Firefox cache
+    "*/mozilla/firefox/*/cache*" # Firefox cache
+    "*/Thunderbird/Profiles/*/cache*" # Thunderbird cache
+    "*/ImagingTools/*"      # Image editing temp files
+    "*/saved application state/*" # Saved application states
+    "*/Application Support/*/Cache/*" # macOS-style cache location
+    "*/spotify/Data/*"      # Spotify cached data
+    "*/Teams/Cache/*"       # Microsoft Teams cache
+    "*/Teams/Code Cache/*"  # Microsoft Teams code cache
+    "*/Skype/Cache/*"       # Skype cache
+    "*/signal-desktop/Cache/*" # Signal cache
+    "*/Postman/Cache/*"     # Postman cache
+    "*/JetBrains/*/caches/*" # JetBrains IDEs caches
+    
+    # Development tools and libraries
     "*/npm/*"               # Node.js package cache/installs in home
     "*/yarn/*"              # Yarn package cache
     "*/go/*"                # Go build cache
     "*/pip/*"               # Python pip cache
     "*/gradle/*"            # Gradle cache
+    "*/composer/cache/*"    # PHP Composer cache
+    "*/m2/repository/*"     # Maven repository
+    "*/cargo/registry/*"    # Rust Cargo registry
+    "*/node_modules/*"      # Node.js dependencies
+    "*/vendor/*"            # Common directory for dependencies
+    "*/.vscode/extensions/*" # VS Code extensions (can be reinstalled)
+    "*/gems/*"              # Ruby gems
+    "*/bower_components/*"  # Bower components
+    "*/target/*"            # Common build target directory
+    "*/build/*"             # Common build directory
+    "*/dist/*"              # Common distribution directory
+    "*/.venv/*"             # Python virtual environments
+    "*/env/*"               # Another common venv name
+    "*/virtualenv/*"        # Another virtual env name
+    "*/.tox/*"              # Python tox environments
+    "*/.eggs/*"             # Python eggs
+    "*/site-packages/*"     # Python site packages
+    "*/wheelhouse/*"        # Python wheels
+    "*/.pytest_cache/*"     # Pytest cache
+    "*/.ipynb_checkpoints/*" # Jupyter notebook checkpoints
+    "*/.terraform/*"        # Terraform cache
+    "*/.terragrunt-cache/*" # Terragrunt cache
+    
+    # Container and VM data
     "*/.var/*"              # Flatpak data (usually large)
-    "*/Steam/*"             # Steam data
-    "*/lutris/runners/*"    # Lutris runners/games
-    "*/Games/*"             # General Games directories
-    "*/.local/share/Trash/*"
-    "*/.local/share/icc/*"   # Color profiles
-    "*/.local/share/gvfs-metadata/*" # GVFS metadata
-    "*/.local/share/webkitgtk/*" # Webkit cache
     "*/.local/share/flatpak/*" # Flatpak data (redundant if .var is excluded, but safer)
     "*/.local/share/containers/*" # Podman/Buildah data
     "*/.local/share/libvirt/*" # libvirt data
+    "*/docker/overlay2/*"   # Docker overlays
+    "*/docker/image/*"      # Docker images
+    "*/docker/volumes/*"    # Docker volumes
+    "*/VirtualBox VMs/*"    # VirtualBox VMs
+    "*/VMs/*"               # Generic VMs directory
+    "*/lxc/*"               # LXC containers
+    "*/.vagrant.d/boxes/*"  # Vagrant boxes
+    
+    # Gaming and large application data
+    "*/Steam/*"             # Steam data
+    "*/lutris/runners/*"    # Lutris runners/games
+    "*/Games/*"             # General Games directories
+    "*/GOG Games/*"         # GOG games
+    "*/Epic Games/*"        # Epic Games
+    "*/Origin/*"            # EA Origin
+    "*/Ubisoft/*"           # Ubisoft games
+    "*/BattleNet/*"         # Battle.net
+    "*/Wine/*"              # Wine prefix
+    "*/PlayOnLinux/*"       # PlayOnLinux
+    "*/Proton/*"            # Proton for Steam
+    
+    # XDG directories and system data
+    "*/.local/share/Trash/*" # Trash
+    "*/.local/share/icc/*"   # Color profiles
+    "*/.local/share/gvfs-metadata/*" # GVFS metadata
+    "*/.local/share/webkitgtk/*" # Webkit cache
     "*/.local/state/*"      # XDG State directory
-    # NSS database (can be regenerated) <--- Moved comment UP
-    "*/.pki/nssdb/*"
-    # VS Code extensions (can be reinstalled) <--- Moved comment UP
-    "*/.vscode/extensions/*"
-    # Common directory for dependencies <--- Moved comment UP
-    "*/vendor/*"
-    # Node.js dependencies <--- Moved comment UP
-    "*/node_modules/*"
+    "*/.local/share/recently-used.xbel" # Recently used files
+    "*/.local/share/thumbnails/*" # Thumbnails
+    "*/.local/share/tracker/*" # GNOME tracker
+    "*/.local/share/baloo/*" # KDE file indexer
+    "*/.local/share/akonadi/*" # KDE PIM storage
+    "*/.local/share/zeitgeist/*" # Activity logger
+    "*/.local/share/telepathy/*" # IM framework
+    "*/.pki/nssdb/*"        # NSS database (can be regenerated)
+    "*/.esd_auth"           # ESD authentication
+    
+    # Media cache/data (often large)
+    "*/Spotify/Data/*"      # Spotify data
+    "*/spotify/Storage/*"   # Spotify storage
+    "*/Podcasts/*"          # Podcast downloads
+    "*/Music/iTunes/*"      # iTunes library
+    "*/Pictures/Photos Library.photoslibrary/*" # Photos library
+    "*/Videos/*"            # Video files
+    "*/Downloads/*"         # Downloaded files
+    
+    # Miscellaneous large or unnecessary data
+    "*.localstorage"        # Local storage files
+    "*/Dropbox/*"           # Dropbox files (often synced elsewhere)
+    "*/OneDrive/*"          # OneDrive files (often synced elsewhere)
+    "*/Google Drive/*"      # Google Drive files (often synced elsewhere)
+    "*/Next Cloud/*"        # NextCloud files (often synced elsewhere)
+    "*/iCloud/*"            # iCloud files (often synced elsewhere)
+    "*/snap/*/current/*"    # Snap package data
+    "*/snap/*/common/*"     # Snap common data
 )
 
 # List of system configuration files and directories to back up.
 # These REQUIRE sudo privileges. Select carefully.
 # Add paths line by line, separated by spaces or newlines.
 SYSTEM_CONFIG_ITEMS=(
-    "/etc/fstab"
-    "/etc/hosts"
-    "/etc/hostname"
-    "/etc/resolv.conf" # Note: Often a symlink, backs up the target
-    "/etc/netplan"       # Netplan network configuration
-    "/etc/network/interfaces" # Older network config style
-    "/etc/default"       # Default settings for many services/commands
-    "/etc/environment"
-    "/etc/sysctl.conf"
-    "/etc/sysctl.d"
-    "/etc/sudoers"       # VERY SENSITIVE! Handle with care.
-    "/etc/sudoers.d"     # Custom sudo rules
-    "/etc/apt/sources.list"
-    "/etc/apt/sources.list.d"
-    "/etc/ufw"           # UFW firewall configuration files
-    "/etc/ssh/sshd_config" # SSH server configuration
-    "/etc/lightdm"       # LightDM display manager config
-    "/etc/gdm3"          # GDM3 display manager config
-    "/etc/default/grub"  # GRUB bootloader config
-    "/etc/X11/xorg.conf" # X.org server config (often not present)
-    "/etc/X11/xorg.conf.d" # X.org server config snippets
-    # Add other system-wide config files/directories you need backed up:
-    # "/etc/myapp.conf"
-    # "/etc/security/limits.conf"
-)
+    # System identification
+    "/etc/fstab"             # Filesystem table
+    "/etc/hosts"             # Host name resolution
+    "/etc/hostname"          # System hostname
+    "/etc/machine-id"        # Machine identifier
+    "/etc/os-release"        # OS information
+    "/etc/lsb-release"       # Distribution information
 
+    # Network configuration
+    "/etc/resolv.conf"       # DNS resolver configuration
+    "/etc/netplan"           # Netplan network configuration
+    "/etc/network/interfaces" # Classical network configuration
+    "/etc/network/interfaces.d" # Network interface configurations
+    "/etc/NetworkManager/system-connections" # NetworkManager connections
+    "/etc/NetworkManager/conf.d" # NetworkManager configuration
+    "/etc/netctl"            # Arch Linux network manager
+    "/etc/systemd/network"   # systemd network configuration
+    "/etc/hosts.allow"       # TCP wrappers allow rules
+    "/etc/hosts.deny"        # TCP wrappers deny rules
+    "/etc/nftables.conf"     # nftables firewall configuration
+    "/etc/iptables"          # iptables firewall rules
+    "/etc/ufw"               # UFW firewall configuration
+    "/etc/dhcp"              # DHCP client/server configuration
+    "/etc/wpa_supplicant"    # Wi-Fi configuration
+    "/etc/iproute2"          # IP routing configuration
+    "/etc/sysconfig/network-scripts" # Red Hat/CentOS network config
+
+    # System environment and settings
+    "/etc/environment"       # System-wide environment variables
+    "/etc/profile.d"         # Shell initialization scripts
+    "/etc/profile"           # System-wide profile
+    "/etc/bash.bashrc"       # System-wide bashrc
+    "/etc/zsh"               # System-wide zsh configuration
+    "/etc/inputrc"           # Readline configuration
+    "/etc/locale.conf"       # System locale settings
+    "/etc/locale.gen"        # Locale generation configuration
+    "/etc/default"           # Default settings for services
+    "/etc/sysctl.conf"       # Kernel parameters configuration
+    "/etc/sysctl.d"          # Additional kernel parameters
+    "/etc/security"          # PAM security settings
+    "/etc/security/limits.conf" # Resource limits
+    "/etc/security/limits.d" # Additional resource limits
+    "/etc/modules"           # Kernel modules to load at boot
+    "/etc/modules-load.d"    # Additional kernel modules
+    "/etc/modprobe.d"        # Module blacklisting/options
+    "/etc/vconsole.conf"     # Virtual console configuration
+    "/etc/systemd/system.conf" # systemd system configuration
+    "/etc/systemd/user.conf" # systemd user configuration
+    "/etc/systemd/journald.conf" # journald logging configuration
+    "/etc/systemd/logind.conf" # logind session management configuration
+    "/etc/systemd/resolved.conf" # systemd-resolved DNS resolver
+    "/etc/systemd/timesyncd.conf" # systemd time sync daemon
+    "/etc/systemd/system"    # systemd system unit files
+    "/etc/tmpfiles.d"        # Temporary files configuration
+    "/etc/rc.local"          # Startup script (if it exists)
+    "/etc/motd"              # Message of the day
+    "/etc/issue"             # Pre-login message
+    "/etc/issue.net"         # Pre-login message for network users
+
+    # Package management
+    "/etc/apt/sources.list"  # APT package sources (Debian/Ubuntu)
+    "/etc/apt/sources.list.d" # Additional APT sources
+    "/etc/apt/preferences"   # APT preferences
+    "/etc/apt/preferences.d" # Additional APT preferences
+    "/etc/apt/apt.conf"      # APT configuration
+    "/etc/apt/apt.conf.d"    # Additional APT configuration
+    "/etc/pacman.conf"       # Pacman package manager configuration (Arch)
+    "/etc/pacman.d"          # Pacman additional configuration
+    "/etc/yum.conf"          # Yum package manager (RHEL/CentOS)
+    "/etc/yum.repos.d"       # Yum repositories
+    "/etc/dnf/dnf.conf"      # DNF package manager (Fedora)
+    "/etc/dnf/modules.d"     # DNF modules configuration
+    "/etc/zypp"              # Zypper package manager (openSUSE)
+    "/etc/flatpak"           # Flatpak configuration
+
+    # Authentication and security
+    "/etc/sudoers"           # VERY SENSITIVE! Sudo configuration
+    "/etc/sudoers.d"         # Additional sudo rules
+    "/etc/pam.d"             # PAM authentication configuration
+    "/etc/login.defs"        # Shadow password suite configuration
+    "/etc/shadow"            # VERY SENSITIVE! Encrypted passwords (requires special handling)
+    "/etc/gshadow"           # VERY SENSITIVE! Group passwords (requires special handling)
+    "/etc/group"             # Group definitions
+    "/etc/passwd"            # User account information
+    "/etc/ssh/sshd_config"   # SSH server configuration
+    "/etc/ssh/ssh_config"    # SSH client configuration
+    "/etc/ssl/certs"         # SSL certificates
+    "/etc/ssl/private"       # VERY SENSITIVE! SSL private keys
+    "/etc/ca-certificates"   # CA certificates configuration
+    "/etc/krb5.conf"         # Kerberos configuration
+    "/etc/fail2ban"          # Fail2ban configuration
+    "/etc/apparmor"          # AppArmor configuration
+    "/etc/apparmor.d"        # AppArmor profiles
+    "/etc/selinux"           # SELinux configuration
+    "/etc/openssl"           # OpenSSL configuration
+    "/etc/pki"               # Public Key Infrastructure
+
+    # Boot and system startup
+    "/etc/default/grub"      # GRUB bootloader configuration
+    "/etc/grub.d"            # GRUB bootloader scripts
+    "/boot/grub/grub.cfg"    # GRUB configuration file (generated)
+    "/boot/grub2/grub.cfg"   # GRUB2 configuration file (generated)
+    "/boot/efi"              # EFI boot files (use with caution)
+    "/etc/systemd/system"    # systemd service units
+    "/etc/rc.d"              # Init scripts (non-systemd systems)
+    "/etc/init.d"            # Init scripts (SysV style)
+    "/etc/inittab"           # Init configuration (SysV style)
+    "/etc/dracut.conf"       # Initramfs generation
+    "/etc/dracut.conf.d"     # Additional initramfs configuration
+    "/etc/mkinitcpio.conf"   # Initramfs generation (Arch)
+    "/etc/default/useradd"   # Default settings for new users
+
+    # Display managers and desktop environments
+    "/etc/lightdm"           # LightDM display manager config
+    "/etc/gdm3"              # GDM3 display manager config
+    "/etc/gdm"               # GDM display manager config
+    "/etc/sddm.conf"         # SDDM display manager config
+    "/etc/sddm.conf.d"       # Additional SDDM configuration
+    "/etc/X11/xorg.conf"     # X.org server config (if present)
+    "/etc/X11/xorg.conf.d"   # X.org server config snippets
+    "/etc/X11/xinit"         # X initialization
+    "/etc/xdg"               # XDG base directory specification
+
+    # File systems and storage
+    "/etc/crypttab"          # Encrypted filesystems
+    "/etc/mdadm.conf"        # Software RAID configuration
+    "/etc/mdadm/mdadm.conf"  # Alternative RAID config location
+    "/etc/lvm"               # Logical Volume Manager configuration
+    "/etc/multipath"         # Multipath device configuration
+    "/etc/mtab"              # Mounted filesystems (usually a symlink)
+    "/etc/autofs"            # Automounter configuration
+    "/etc/exports"           # NFS exports
+    "/etc/samba/smb.conf"    # Samba configuration
+    "/etc/updatedb.conf"     # updatedb configuration for locate
+
+    # Services and daemons
+    "/etc/cron.d"            # Cron job directories
+    "/etc/cron.daily"        # Daily cron jobs
+    "/etc/cron.hourly"       # Hourly cron jobs
+    "/etc/cron.monthly"      # Monthly cron jobs
+    "/etc/cron.weekly"       # Weekly cron jobs
+    "/etc/crontab"           # System crontab
+    "/etc/cups"              # CUPS printing system
+    "/etc/ntp.conf"          # NTP configuration
+    "/etc/chrony"            # Chrony time service
+    "/etc/mysql"             # MySQL/MariaDB configuration
+    "/etc/postgresql"        # PostgreSQL configuration
+    "/etc/nginx"             # Nginx web server
+    "/etc/apache2"           # Apache web server (Debian/Ubuntu)
+    "/etc/httpd"             # Apache web server (RHEL/CentOS)
+    "/etc/php"               # PHP configuration
+    "/etc/postfix"           # Postfix mail server
+    "/etc/dovecot"           # Dovecot mail server
+    "/etc/openvpn"           # OpenVPN configuration
+    "/etc/wireguard"         # WireGuard VPN
+    "/etc/squid"             # Squid proxy
+    "/etc/bind"              # BIND DNS server
+    "/etc/named"             # BIND DNS (alternative location)
+    "/etc/nsd"               # NSD DNS server
+    "/etc/dnsmasq.conf"      # Dnsmasq DNS/DHCP
+    "/etc/dnsmasq.d"         # Dnsmasq additional configuration
+    "/etc/docker"            # Docker configuration
+    "/etc/libvirt"           # Libvirt virtualization
+    "/etc/qemu"              # QEMU virtualization
+    "/etc/default/docker"    # Docker defaults
+    "/etc/containerd"        # containerd configuration
+    "/etc/cni"               # Container Network Interface
+    "/etc/haproxy"           # HAProxy load balancer
+    "/etc/redis"             # Redis database
+    "/etc/mongodb"           # MongoDB database
+    "/etc/memcached.conf"    # Memcached configuration
+    "/etc/pulse"             # PulseAudio sound server
+    "/etc/bluetooth"         # Bluetooth configuration
+    "/etc/rsyslog.conf"      # Rsyslog configuration
+    "/etc/rsyslog.d"         # Additional rsyslog configuration
+    "/etc/logrotate.conf"    # Log rotation configuration
+    "/etc/logrotate.d"       # Additional log rotation configurations
+    "/etc/audit"             # Audit daemon configuration
+    
+    # Hardware and peripherals
+    "/etc/X11/xorg.conf.d"   # X.org configuration snippets
+    "/etc/udev/rules.d"      # udev rules
+    "/etc/udisks2"           # Disk management
+    "/etc/acpi"              # ACPI power management
+    "/etc/sensors.d"         # Hardware sensors configuration
+    "/etc/sane.d"            # Scanner configuration
+    "/etc/cups"              # Printing system
+    "/etc/pulse"             # PulseAudio sound server
+    "/etc/alsa"              # ALSA sound configuration
+    "/etc/bluetooth"         # Bluetooth configuration
+    "/etc/modules-load.d"    # Kernel modules to load
+    "/etc/modprobe.d"        # Module options and blacklisting
+    "/etc/console-setup"     # Console setup
+
+    # Miscellaneous important configs
+    "/etc/kernel"            # Kernel related configurations
+    "/etc/fonts"             # Font configuration
+    "/etc/dconf"             # GNOME configuration database
+    "/etc/alternatives"      # System alternatives
+    "/etc/mailcap"           # MIME type handlers
+    "/etc/mime.types"        # MIME type definitions
+    "/etc/shells"            # Valid login shells
+    "/etc/timezone"          # System timezone
+    "/etc/localtime"         # Timezone symlink
+    "/var/spool/cron"        # User crontabs
+)
 # ==============================================================================
 # --- Script Starts Here ---
 # ==============================================================================
