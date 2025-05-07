@@ -106,10 +106,14 @@ EXCLUDE_PATTERNS=(
     "*/.local/share/containers/*" # Podman/Buildah data
     "*/.local/share/libvirt/*" # libvirt data
     "*/.local/state/*"      # XDG State directory
-    "*/.pki/nssdb/*"        # NSS database (can be regenerated)
-    "*/.vscode/extensions/*"# VS Code extensions (can be reinstalled)
-    "*/vendor/*"            # Common directory for dependencies
-    "*/node_modules/*"      # Node.js dependencies
+    # NSS database (can be regenerated) <--- Moved comment UP
+    "*/.pki/nssdb/*"
+    # VS Code extensions (can be reinstalled) <--- Moved comment UP
+    "*/.vscode/extensions/*"
+    # Common directory for dependencies <--- Moved comment UP
+    "*/vendor/*"
+    # Node.js dependencies <--- Moved comment UP
+    "*/node_modules/*"
 )
 
 # List of system configuration files and directories to back up.
