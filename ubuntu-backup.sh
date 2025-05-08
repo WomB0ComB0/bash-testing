@@ -8,7 +8,7 @@
 # It is NOT a full system backup and does NOT include user data like Documents,
 # Pictures, Videos, etc.
 #
-# Restore is a MANUAL process and depends on the item being restored.
+# Restoration is a MANUAL process and depends on the item being restored.
 #
 # ==============================================================================
 # --- Configuration ---
@@ -16,6 +16,8 @@
 
 # Backup location: Where the final archive or directory will be placed.
 # Defaults to the user's home directory.
+# IMPORTANT: Run this script as your normal user, NOT with 'sudo ./script.sh'.
+# The script uses 'sudo' internally for files requiring root permissions.
 BACKUP_DEST_DIR="$HOME"
 
 # Archiving: Set to true to create a compressed tar archive of the backup directory.
@@ -499,8 +501,8 @@ SYSTEM_CONFIG_ITEMS=(
     "/etc/sudoers.d"         # Additional sudo rules
     "/etc/pam.d"             # PAM authentication configuration
     "/etc/login.defs"        # Shadow password suite configuration
-    "/etc/shadow"            # VERY SENSITIVE! Encrypted passwords (requires special handling)
-    "/etc/gshadow"           # VERY SENSITIVE! Group passwords (requires special handling)
+    # "/etc/shadow"            # VERY SENSITIVE! Encrypted passwords (requires special handling - SKIPPING)
+    # "/etc/gshadow"           # VERY SENSITIVE! Group passwords (requires special handling - SKIPPING)
     "/etc/group"             # Group definitions
     "/etc/passwd"            # User account information
     "/etc/ssh/sshd_config"   # SSH server configuration
@@ -623,7 +625,7 @@ SYSTEM_CONFIG_ITEMS=(
     "/etc/shells"            # Valid login shells
     "/etc/timezone"          # System timezone
     "/etc/localtime"         # Timezone symlink
-    "/var/spool/cron"        # User crontabs
+    "/var/spool/cron"        # User crontabs (Needs sudo to read other users' crontabs, though crontab -l gets current user)
 )
 # ==============================================================================
 # --- Script Starts Here ---
@@ -714,6 +716,7 @@ run_rsync() {
     for excl in "${excludes[@]}"; do
         rsync_cmd+=(--exclude="$excl")
     done
+    rsync_cmd+=(--no-perms --no-owner --no-group) # Don't preserve root permissions/owner for user files
     rsync_cmd+=("$src" "$dest")
 
     # Add --progress only if not archiving and output is interactive
@@ -744,12 +747,23 @@ run_copy() {
     mkdir -p "$(dirname "$dest")" || log_error "Failed to create directory for $dest"
 
     # Use cp -a for archive mode (preserves permissions, timestamps, etc.)
-    # Using '|| true' prevents set -e from exiting on cp failure, allowing other backups to continue
-    if cp -a "$src" "$dest"; then
-        log_success "Backed up '$item_name'."
+    # But remove 'p' (perms), 'o' (owner), 'g' (group) if backing up user files as user,
+    # so root-owned files in $HOME don't fail. cp -a doesn't have granular flags like rsync.
+    # Let's just use simple cp -r if it's a directory, or cp if it's a file, for robustness.
+    if [ -d "$src" ]; then
+       if cp -r "$src" "$dest"; then # Use -r for directories
+           log_success "Backed up '$item_name'."
+       else
+           log_warning "cp failed for '$item_name'. Continuing with other backups."
+           true # Ensure the if block returns true
+       fi
     else
-        log_warning "cp failed for '$item_name'. Continuing with other backups."
-        true # Ensure the if block returns true
+        if cp "$src" "$dest"; then # Use plain cp for files
+             log_success "Backed up '$item_name'."
+        else
+             log_warning "cp failed for '$item_name'. Continuing with other backups."
+             true # Ensure the if block returns true
+        fi
     fi
 }
 
@@ -772,7 +786,9 @@ mkdir -p "$BACKUP_DIR/home-config-rsync/" || log_error "Failed to create directo
 for item in "${USER_CONFIG_RSYNC_ITEMS[@]}"; do
     # Ensure source path exists and is within home directory
     if [ -e "$HOME/$item" ]; then
-        run_rsync "$HOME/$item" "$BACKUP_DIR/home-config-rsync/" "${EXCLUDE_PATTERNS[@]}"
+        # Added --no-perms, --no-owner, --no-group to rsync for user files
+        # This prevents errors if some dotfiles/dirs in $HOME are unexpectedly owned by root or have special permissions
+        run_rsync "$HOME/$item" "$BACKUP_DIR/home-config-rsync/" "${EXCLUDE_PATTERNS[@]}" --no-perms --no-owner --no-group
     else
         log_info "$HOME/$item not found, skipping."
     fi
@@ -786,6 +802,7 @@ for item in "${USER_CONFIG_COPY_ITEMS[@]}"; do
     # Ensure source path exists and is within home directory
     if [ -e "$HOME/$item" ]; then
         # Use basename to keep the original file/dir name in the destination
+        # Modified run_copy to handle files/dirs appropriately
         run_copy "$HOME/$item" "$BACKUP_DIR/home-config-copy/$(basename "$HOME/$item")"
     else
         log_info "$HOME/$item not found, skipping."
@@ -797,10 +814,11 @@ log_success "Finished backing up copy user configuration items."
 # --- 3. Backup user-level cron jobs ---
 log_info "🕒 Backing up user cron jobs..."
 mkdir -p "$BACKUP_DIR/cronjobs" || log_error "Failed to create cronjobs directory"
+# crontab -l reads the current *user's* crontab, doesn't need sudo if run as the user
 if crontab -l > "$BACKUP_DIR/cronjobs/crontab.bak" 2>/dev/null; then
     log_success "User cron jobs backed up."
 else
-    log_info "No user cron jobs found or error accessing them."
+    log_info "No user cron jobs found or error accessing them (output to /dev/null)."
     # Create an empty file to indicate this section was attempted
     touch "$BACKUP_DIR/cronjobs/crontab.bak.empty"
 fi
@@ -846,6 +864,7 @@ if sudo -v >/dev/null 2>&1; then # Check if user *can* sudo
         if [ -e "$item" ]; then
             # Use basename to keep the original file/dir name in the destination
             # Using '|| true' to allow script to continue if sudo rsync fails for an item
+            # Preserve root permissions/owner for system files
             if sudo rsync -avh "$item" "$BACKUP_DIR/system-config/$(basename "$item")"; then
                  log_success "Backed up system config: '$item'."
                  backed_up_system_config=true
@@ -900,29 +919,29 @@ fi
 log_info "📦 Backing up package lists..."
 mkdir -p "$BACKUP_DIR/package-lists" || log_error "Failed to create package-lists directory"
 
-# APT packages
+# APT packages (Requires sudo to get complete list reliably)
 if command -v dpkg >/dev/null 2>&1; then
     log_info "Backing up APT package list..."
     # Using '|| true' to allow script to continue if command fails
-    if dpkg --get-selections > "$BACKUP_DIR/package-lists/dpkg-selections.list"; then
+    if sudo dpkg --get-selections > "$BACKUP_DIR/package-lists/dpkg-selections.list"; then
         log_success "Backed up APT package list."
     else
-        log_warning "Failed to backup APT package list."
+        log_warning "Failed to backup APT package list (requires sudo)."
         true # Ensure the if block returns true
     fi
 else
     log_info "dpkg not found, skipping APT package list backup."
 fi
 
-# PPA repositories list
+# PPA repositories list (Requires sudo)
 if command -v apt-add-repository >/dev/null 2>&1; then
      log_info "Backing up PPA list..."
      # apt-add-repository --list prints to stderr, so redirecting stderr to stdout
      # Using '|| true' to allow script to continue if command fails
-    if apt-add-repository --list > "$BACKUP_DIR/package-lists/ppa-list.list" 2>&1; then
+    if sudo apt-add-repository --list > "$BACKUP_DIR/package-lists/ppa-list.list" 2>&1; then
         log_success "Backed up PPA list."
     else
-        log_warning "Failed to backup PPA list."
+        log_warning "Failed to backup PPA list (requires sudo)."
         true # Ensure the if block returns true
     fi
 else
@@ -964,19 +983,20 @@ log_info "📝 Backing up custom scripts from ~/bin and ~/.local/bin..."
 mkdir -p "$BACKUP_DIR/custom-scripts/" || log_error "Failed to create custom-scripts directory"
 
 if [ -d "$HOME/bin" ]; then
-    run_rsync "$HOME/bin/" "$BACKUP_DIR/custom-scripts/bin/"
+    run_rsync "$HOME/bin/" "$BACKUP_DIR/custom-scripts/bin/" --no-perms --no-owner --no-group
 else
     log_info "$HOME/bin not found, skipping ~/bin backup."
 fi
 
 if [ -d "$HOME/.local/bin" ]; then
-    run_rsync "$HOME/.local/bin/" "$BACKUP_DIR/custom-scripts/local_bin/"
+    run_rsync "$HOME/.local/bin/" "$BACKUP_DIR/custom-scripts/local_bin/" --no-perms --no-owner --no-group
 else
     log_info "$HOME/.local/bin not found, skipping ~/.local/bin backup."
 fi
 log_success "Finished backing up custom scripts."
 
 # --- 9. Backup GNOME settings (if applicable) ---
+# dconf dump should be run as the user, not root
 if command -v dconf >/dev/null 2>&1; then
     log_info "🖥️ Backing up GNOME settings using dconf..."
     mkdir -p "$BACKUP_DIR/gnome-settings" || log_error "Failed to create gnome-settings directory"
@@ -997,6 +1017,7 @@ if command -v ufw >/dev/null 2>&1; then
     mkdir -p "$BACKUP_DIR/ufw/" || log_error "Failed to create ufw directory"
     if sudo -v >/dev/null 2>&1; then # Check if user can sudo
         # Using '|| true' to allow script to continue if any ufw command fails
+        # Note: ufw export writes to stdout, need to redirect it
         if sudo ufw status verbose > "$BACKUP_DIR/ufw/ufw-status-verbose.txt" 2>&1 && \
            sudo ufw status numbered > "$BACKUP_DIR/ufw/ufw-status-numbered.txt" 2>&1 && \
            sudo ufw export > "$BACKUP_DIR/ufw/ufw.rules"; then # ufw export is the key file for restoring
@@ -1014,11 +1035,12 @@ fi
 
 
 # --- Archiving ---
+# Moved trap creation earlier, right after temp dir creation
 if [ "$ARCHIVE" = true ]; then
     log_info "📦 Creating archive..."
 
     ARCHIVE_FILE="$BACKUP_DEST_DIR/$FINAL_BACKUP_NAME.tar.${ARCHIVE_FORMAT}"
-    local tar_options=""
+    tar_options="" # Removed 'local'
 
     case "$ARCHIVE_FORMAT" in
         gz)
@@ -1054,7 +1076,7 @@ fi
 # --- Post-Backup Actions: Open Directory ---
 
 # Determine the final location to open based on whether archiving was done
-local path_to_open=""
+path_to_open="" # Removed 'local'
 if [ "$ARCHIVE" = true ]; then
     # If archived, the archive file is in BACKUP_DEST_DIR. Open that directory.
     path_to_open="$BACKUP_DEST_DIR"
@@ -1083,10 +1105,7 @@ else
     log_warning "xdg-open command not found. Cannot open the backup directory automatically."
 fi
 
-
-# The trap function handles the final exit and cleanup if archiving was used.
-# If not archiving, the script exits naturally here (or via set -e on failure).
-# log_info "✨ Backup process finished." # This line is not reachable because of the EXIT trap
+log_info "✨ Backup process finished." # This line is now reachable after xdg-open attempts
 
 
 # ==============================================================================
@@ -1096,15 +1115,16 @@ fi
 #
 # 1. Extract the archive (if created):
 #    For .tar.xz: tar xvf /path/to/your/ubuntu-config-backup-YYYYMMDD_HHMMSS.tar.xz -C /tmp/restore_$$
-#    For .tar.gz: tar xvf /path/to/your/ubuntu-config-backup-YYYYMMDD_HHMMSS.tar.gz -C /tmp/restore_$$
+#    For .tar.gz: tar xvf /path/to/your/ubuntu-config-backup-YYYYMMSS.tar.gz -C /tmp/restore_$$
 #    Replace /path/to/your/ with the actual path. This extracts contents to a temporary directory.
-#    Inside /tmp/restore_$$ you'll find the backup directory (e.g., ubuntu-config-backup-YYYYMMDD_HHMMSS).
+#    Inside /tmp/restore_$$ you'll find the backup directory (e.g., ubuntu-config-backup-YYYYMMSS).
 #
 # 2. Restore items manually:
 #    - Home config (rsync/copy): Copy files/directories back to your home directory using 'cp' or 'rsync', e.g.,
 #      cp -a /tmp/restore_$$/ubuntu-config-backup-YYYYMMDD_HHMMSS/home-config-copy/.gitconfig ~/
 #      rsync -avh /tmp/restore_$$/ubuntu-config-backup-YYYYMMDD_HHMMSS/home-config-rsync/.config/myapp/ ~/.config/myapp/
 #      **Be cautious** when overwriting existing files, especially for directories like .config. Consider merging or backing up current configs first.
+#      NOTE: User files were backed up without preserving ownership/permissions. Restore them as your user.
 #    - Cron jobs: Use 'crontab /tmp/restore_$$/.../cronjobs/crontab.bak'. This *replaces* your current user cron.
 #    - System cron jobs: Manually copy files from /tmp/restore_$$/.../system-cron/ to /etc/cron* (requires sudo).
 #    - System config files: Manually copy files from /tmp/restore_$$/.../system-config/ to their original locations (e.g., /etc/fstab). **EXTREME CAUTION REQUIRED.** Incorrect system files can prevent your system from booting. Always back up existing files before replacing them. (Requires sudo).
