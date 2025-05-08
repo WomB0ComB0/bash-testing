@@ -317,12 +317,12 @@ EXCLUDE_PATTERNS=(
     "*/saved application state/*" # Saved application states
     "*/Application Support/*/Cache/*" # macOS-style cache location
     "*/spotify/Data/*"      # Spotify cached data
-    "*/Teams/Cache/*"       # Microsoft Teams cache
-    "*/Teams/Code Cache/*"  # Microsoft Teams code cache
-    "*/Skype/Cache/*"       # Skype cache
-    "*/signal-desktop/Cache/*" # Signal cache
-    "*/Postman/Cache/*"     # Postman cache
-    "*/JetBrains/*/caches/*" # JetBrains IDEs caches
+    "*/spotify/Storage/*"   # Spotify storage
+    "*/Podcasts/*"          # Podcast downloads
+    "*/Music/iTunes/*"      # iTunes library
+    "*/Pictures/Photos Library.photoslibrary/*" # Photos library
+    "*/Videos/*"            # Video files
+    "*/Downloads/*"         # Downloaded files
     
     # Development tools and libraries
     "*/npm/*"               # Node.js package cache/installs in home
@@ -587,7 +587,7 @@ SYSTEM_CONFIG_ITEMS=(
     "/etc/containerd"        # containerd configuration
     "/etc/cni"               # Container Network Interface
     "/etc/haproxy"           # HAProxy load balancer
-    "/etc/redis"             # Redis database
+    "/etc/redis"           # Redis database
     "/etc/mongodb"           # MongoDB database
     "/etc/memcached.conf"    # Memcached configuration
     "/etc/pulse"             # PulseAudio sound server
@@ -672,6 +672,24 @@ if [ "$ARCHIVE" = true ]; then
     log_info "Building backup content in temporary directory: ${BACKUP_ROOT}"
     # The actual backup directory *within* the temp root
     BACKUP_DIR="$BACKUP_ROOT/$FINAL_BACKUP_NAME"
+
+    # Trap to clean up temporary directory on exit (success or failure)
+    # Make sure this trap is set *after* the temp dir is created
+    cleanup_temp_dir() {
+        local exit_status=$? # Capture the exit status before cleaning up
+        log_info "Cleaning up temporary directory ${BACKUP_ROOT}..."
+        if [ -d "$BACKUP_ROOT" ]; then
+             # Use '|| true' to prevent the trap itself from failing if rm fails
+            rm -rf "$BACKUP_ROOT" || true
+            log_info "Temporary directory cleaned up."
+        fi
+        # Re-exit with the original exit status
+        exit "$exit_status"
+    }
+    # Trap on EXIT (script finished) or ERR (non-zero exit status)
+    trap cleanup_temp_dir EXIT
+    # trap cleanup_temp_dir ERR # set -e combined with the EXIT trap is usually sufficient
+
 else
     # Create the final backup directory directly in the destination
     BACKUP_DIR="$BACKUP_DEST_DIR/$FINAL_BACKUP_NAME"
@@ -704,12 +722,14 @@ run_rsync() {
     # fi
 
     # Run the command and check exit status
+    # Using '|| true' prevents set -e from exiting on rsync failure, allowing other backups to continue
     if "${rsync_cmd[@]}"; then
         log_success "Backed up '$item_name'."
     else
         log_warning "rsync failed for '$item_name'. Continuing with other backups."
         # Optionally uncomment the line below to stop the script on any rsync failure
         # log_error "rsync failed for '$item_name'."
+        true # Ensure the if block returns true so set -e doesn't trigger
     fi
 }
 
@@ -724,10 +744,12 @@ run_copy() {
     mkdir -p "$(dirname "$dest")" || log_error "Failed to create directory for $dest"
 
     # Use cp -a for archive mode (preserves permissions, timestamps, etc.)
+    # Using '|| true' prevents set -e from exiting on cp failure, allowing other backups to continue
     if cp -a "$src" "$dest"; then
         log_success "Backed up '$item_name'."
     else
         log_warning "cp failed for '$item_name'. Continuing with other backups."
+        true # Ensure the if block returns true
     fi
 }
 
@@ -789,27 +811,29 @@ mkdir -p "$BACKUP_DIR/system-cron/" || log_error "Failed to create system-cron d
 # Check if sudo works without password for this command (optional but nice)
 if sudo -n true 2>/dev/null; then
     log_info "Passwordless sudo detected, proceeding with system cron backup."
+    # Using '|| true' to allow script to continue if sudo fails for this command
     if sudo rsync -avh /etc/cron* "$BACKUP_DIR/system-cron/"; then
          log_success "System-wide cron jobs backed up."
     else
          log_warning "sudo rsync failed for system cron jobs. Check permissions or sudo setup."
-         # Optionally exit here if system cron backup is critical
-         # log_error "System-wide cron backup failed."
+         true # Ensure the if block returns true
     fi
 elif sudo true 2>/dev/null; then
     # Sudo requires password, let it prompt or inform user
     log_info "Sudo password may be required for system cron backup."
+    # Using '|| true' to allow script to continue if sudo fails for this command
      if sudo rsync -avh /etc/cron* "$BACKUP_DIR/system-cron/"; then
          log_success "System-wide cron jobs backed up."
     else
          log_warning "sudo rsync failed for system cron jobs after prompt. Check permissions or password."
+         true # Ensure the if block returns true
     fi
 else
     log_warning "sudo command not available or user not in sudoers file. Cannot backup system cron jobs."
 fi
 
 
-# --- 5. Backup system configuration files (Requires sudo) ---
+# --- 5. Backup selected system configuration files (Requires sudo) ---
 log_info "⚙️ Backing up selected system configuration files (requires sudo)..."
 mkdir -p "$BACKUP_DIR/system-config/" || log_error "Failed to create system-config directory"
 backed_up_system_config=false
@@ -821,11 +845,13 @@ if sudo -v >/dev/null 2>&1; then # Check if user *can* sudo
         # Check if the source path exists *before* attempting sudo copy
         if [ -e "$item" ]; then
             # Use basename to keep the original file/dir name in the destination
+            # Using '|| true' to allow script to continue if sudo rsync fails for an item
             if sudo rsync -avh "$item" "$BACKUP_DIR/system-config/$(basename "$item")"; then
                  log_success "Backed up system config: '$item'."
                  backed_up_system_config=true
             else
                  log_warning "Failed to backup system config: '$item' (sudo rsync failed)."
+                 true # Ensure the if block returns true
             fi
         else
             log_info "System config item '$item' not found, skipping."
@@ -854,11 +880,13 @@ backed_up_history=false
 for shell in "${!history_files[@]}"; do
     hist_path="${history_files[$shell]}"
     if [ -f "$hist_path" ]; then
+        # Using '|| true' to allow script to continue if cp fails
         if cp "$hist_path" "$BACKUP_DIR/shell-history/${shell}_history.bak"; then
             log_success "Backed up ${shell} history."
             backed_up_history=true
         else
             log_warning "Failed to backup ${shell} history ($hist_path)."
+            true # Ensure the if block returns true
         fi
     fi
 done
@@ -875,10 +903,12 @@ mkdir -p "$BACKUP_DIR/package-lists" || log_error "Failed to create package-list
 # APT packages
 if command -v dpkg >/dev/null 2>&1; then
     log_info "Backing up APT package list..."
+    # Using '|| true' to allow script to continue if command fails
     if dpkg --get-selections > "$BACKUP_DIR/package-lists/dpkg-selections.list"; then
         log_success "Backed up APT package list."
     else
         log_warning "Failed to backup APT package list."
+        true # Ensure the if block returns true
     fi
 else
     log_info "dpkg not found, skipping APT package list backup."
@@ -888,10 +918,12 @@ fi
 if command -v apt-add-repository >/dev/null 2>&1; then
      log_info "Backing up PPA list..."
      # apt-add-repository --list prints to stderr, so redirecting stderr to stdout
+     # Using '|| true' to allow script to continue if command fails
     if apt-add-repository --list > "$BACKUP_DIR/package-lists/ppa-list.list" 2>&1; then
         log_success "Backed up PPA list."
     else
         log_warning "Failed to backup PPA list."
+        true # Ensure the if block returns true
     fi
 else
     log_info "apt-add-repository not found, skipping PPA list backup."
@@ -901,10 +933,12 @@ fi
 # Snap packages
 if command -v snap >/dev/null 2>&1; then
     log_info "Backing up Snap package list..."
+    # Using '|| true' to allow script to continue if command fails
     if snap list > "$BACKUP_DIR/package-lists/snap-packages.list"; then
         log_success "Backed up Snap package list."
     else
         log_warning "Failed to backup Snap package list."
+        true # Ensure the if block returns true
     fi
 else
     log_info "snap not found, skipping Snap package list backup."
@@ -913,10 +947,12 @@ fi
 # Flatpak packages
 if command -v flatpak >/dev/null 2>&1; then
      log_info "Backing up Flatpak package list..."
+     # Using '|| true' to allow script to continue if command fails
      if flatpak list > "$BACKUP_DIR/package-lists/flatpak-packages.list"; then
         log_success "Backed up Flatpak package list."
     else
         log_warning "Failed to backup Flatpak package list."
+        true # Ensure the if block returns true
     fi
 else
     log_info "flatpak not found, skipping Flatpak package list backup."
@@ -944,10 +980,12 @@ log_success "Finished backing up custom scripts."
 if command -v dconf >/dev/null 2>&1; then
     log_info "🖥️ Backing up GNOME settings using dconf..."
     mkdir -p "$BACKUP_DIR/gnome-settings" || log_error "Failed to create gnome-settings directory"
+    # Using '|| true' to allow script to continue if command fails
     if dconf dump / > "$BACKUP_DIR/gnome-settings/dconf-settings.ini"; then
         log_success "GNOME settings backed up."
     else
         log_warning "Failed to backup GNOME settings."
+        true # Ensure the if block returns true
     fi
 else
     log_info "dconf not found, skipping GNOME settings backup."
@@ -958,12 +996,14 @@ if command -v ufw >/dev/null 2>&1; then
     log_info "🔥 Backing up UFW firewall rules (requires sudo)..."
     mkdir -p "$BACKUP_DIR/ufw/" || log_error "Failed to create ufw directory"
     if sudo -v >/dev/null 2>&1; then # Check if user can sudo
+        # Using '|| true' to allow script to continue if any ufw command fails
         if sudo ufw status verbose > "$BACKUP_DIR/ufw/ufw-status-verbose.txt" 2>&1 && \
            sudo ufw status numbered > "$BACKUP_DIR/ufw/ufw-status-numbered.txt" 2>&1 && \
            sudo ufw export > "$BACKUP_DIR/ufw/ufw.rules"; then # ufw export is the key file for restoring
              log_success "UFW rules and status backed up."
         else
              log_warning "Failed to backup UFW rules. Check sudo permissions or UFW status."
+             true # Ensure the if block returns true
         fi
     else
         log_warning "Sudo access required but not available. Cannot backup UFW rules."
@@ -976,23 +1016,6 @@ fi
 # --- Archiving ---
 if [ "$ARCHIVE" = true ]; then
     log_info "📦 Creating archive..."
-
-    # Trap to clean up temporary directory on exit (success or failure)
-    # Make sure this trap is set *after* the temp dir is created
-    cleanup_temp_dir() {
-        local exit_status=$? # Capture the exit status before cleaning up
-        log_info "Cleaning up temporary directory ${BACKUP_ROOT}..."
-        if [ -d "$BACKUP_ROOT" ]; then
-             # Use '|| true' to prevent the trap itself from failing if rm fails
-            rm -rf "$BACKUP_ROOT" || true
-            log_info "Temporary directory cleaned up."
-        fi
-        # Re-exit with the original exit status
-        exit "$exit_status"
-    }
-    # Trap on EXIT (script finished) or ERR (non-zero exit status)
-    trap cleanup_temp_dir EXIT
-    # trap cleanup_temp_dir ERR # set -e combined with the EXIT trap is usually sufficient
 
     ARCHIVE_FILE="$BACKUP_DEST_DIR/$FINAL_BACKUP_NAME.tar.${ARCHIVE_FORMAT}"
     local tar_options=""
@@ -1007,6 +1030,7 @@ if [ "$ARCHIVE" = true ]; then
             check_command "xz"
             ;;
         *)
+            # This should be caught by set -e due to log_error
             log_error "Invalid ARCHIVE_FORMAT '$ARCHIVE_FORMAT' specified. Use 'gz' or 'xz'."
             ;;
     esac
@@ -1027,8 +1051,43 @@ else
     log_success "Backup completed successfully at $BACKUP_DIR."
 fi
 
-# The trap function handles the final exit and cleanup
-# log_info "✨ Backup process finished." # This line won't be reached if trap exits
+# --- Post-Backup Actions: Open Directory ---
+
+# Determine the final location to open based on whether archiving was done
+local path_to_open=""
+if [ "$ARCHIVE" = true ]; then
+    # If archived, the archive file is in BACKUP_DEST_DIR. Open that directory.
+    path_to_open="$BACKUP_DEST_DIR"
+    log_info "Backup archive created at ${ARCHIVE_FILE}." # Added this log here as it's the final outcome log
+else
+    # If not archived, the backup directory is in BACKUP_DEST_DIR. Open that directory.
+    path_to_open="$BACKUP_DIR"
+    # log_success "Backup completed successfully at $BACKUP_DIR." # This log was already above
+fi
+
+log_info "Attempting to open the backup location: '$path_to_open'..."
+# Check if xdg-open exists and if we are in a graphical session
+if command -v xdg-open >/dev/null 2>&1; then
+    # Check for X11 DISPLAY or Wayland WAYLAND_DISPLAY
+    if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+        log_info "Opening directory '$path_to_open' with xdg-open..."
+        # Use nohup and run in background (&) to detach from the script's terminal
+        # Redirect output to /dev/null
+        # Note: We explicitly do *NOT* use sudo xdg-open as it's incorrect for GUI apps
+        nohup xdg-open "$path_to_open" > /dev/null 2>&1 &
+        log_success "xdg-open command issued. The file manager window should appear shortly."
+    else
+        log_warning "Not in a graphical environment (DISPLAY and WAYLAND_DISPLAY are not set), skipping xdg-open."
+    fi
+else
+    log_warning "xdg-open command not found. Cannot open the backup directory automatically."
+fi
+
+
+# The trap function handles the final exit and cleanup if archiving was used.
+# If not archiving, the script exits naturally here (or via set -e on failure).
+# log_info "✨ Backup process finished." # This line is not reachable because of the EXIT trap
+
 
 # ==============================================================================
 # --- Restoration Notes ---
