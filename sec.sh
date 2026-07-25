@@ -258,7 +258,7 @@ pkg_install() {
     case "$PKG_FAMILY" in
         debian) run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@" ;;
         rhel)   run sh -c "dnf install -y $* 2>/dev/null || yum install -y $*" ;;
-        arch)   run pacman -S --noconfirm --needed "$@" ;;
+        arch)   run pacman -Sy --noconfirm --needed "$@" ;;
         alpine) run apk add --no-cache "$@" ;;
         suse)   run zypper --non-interactive install --no-recommends "$@" ;;
     esac
@@ -975,6 +975,7 @@ EOF
                 print_ok "zypper-automatic enabled"
             else
                 # Fallback: cron job that pulls patches but does not reboot.
+                [ -n "$CRON_DAILY" ] && run install -d "$CRON_DAILY"
                 [ -n "$CRON_DAILY" ] && cat <<'EOF' | write_to "$CRON_DAILY/security-updates"
 #!/bin/sh
 # Apply patches (security and recommended) without rebooting.
@@ -990,6 +991,7 @@ EOF
             # Provide a download-and-stage cron that does NOT auto-install, so
             # the operator can review breakage before pulling the trigger.
             [ -n "$CRON_DAILY" ] || { print_warning "no daily cron dir; skipping"; return 0; }
+            run install -d "$CRON_DAILY"
             cat <<'EOF' | write_to "$CRON_DAILY/security-updates"
 #!/bin/sh
 # Arch rolling-release: download pending packages so 'pacman -Syu' is fast,
