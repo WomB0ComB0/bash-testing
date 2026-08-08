@@ -1330,6 +1330,36 @@ session_locker() {
     return 1
 }
 
+# True when this script is running over SSH. Environment variables alone are
+# unreliable — sudo's env_reset strips SSH_CONNECTION — so fall back to walking
+# the process ancestry looking for sshd.
+session_is_remote() {
+    [ -n "${SSH_CONNECTION:-}${SSH_CLIENT:-}${SSH_TTY:-}" ] && return 0
+    local pid=$$ ppid comm depth=0
+    while [ "${pid:-0}" -gt 1 ] && [ "$depth" -lt 20 ]; do
+        comm="$(cat "/proc/$pid/comm" 2>/dev/null)" || break
+        case "$comm" in sshd*) return 0 ;; esac
+        ppid="$(awk '{print $4}' "/proc/$pid/stat" 2>/dev/null)" || break
+        [ -z "$ppid" ] && break
+        pid="$ppid"; depth=$((depth + 1))
+    done
+    return 1
+}
+
+# Restarting the network stack drops every connection on the machine, which
+# over SSH means disconnecting the very session running this script — the same
+# lock-out the SSH module goes to lengths to avoid. Refuse when remote.
+restart_net_stack() {
+    local svc="$1"
+    if session_is_remote; then
+        print_warning "Remote session detected — NOT restarting $svc, it would disconnect you."
+        print_warning "Apply from the console later with: systemctl restart $svc"
+        return 0
+    fi
+    print_warning "Restarting $svc — network connections will drop for a few seconds"
+    svc_restart "$svc" 2>/dev/null || true
+}
+
 # True when MOD exists for the running kernel (or is already loaded). Used to
 # avoid writing blacklist entries for modules this platform never had.
 module_exists() {
@@ -1629,7 +1659,7 @@ ethernet.cloned-mac-address=stable
 # Rotate the stable-id per boot so a single network cannot track you long-term.
 connection.stable-id=${CONNECTION}/${BOOT}
 EOF
-            svc_restart NetworkManager 2>/dev/null || true
+            restart_net_stack NetworkManager
             print_ok "NetworkManager MAC randomisation configured (scan: random, per-connection: stable)"
             ;;
 
@@ -1652,7 +1682,7 @@ AddressRandomizationRange=full
 DisablePeriodicScan=false
 EOF
             fi
-            svc_restart iwd 2>/dev/null || true
+            restart_net_stack iwd
             print_ok "iwd MAC randomisation configured (per-network)"
             ;;
 
@@ -2032,7 +2062,19 @@ EOF
         # Stops anyone at the console from rebooting the box into a rescue
         # target with three keys.
         run systemctl mask ctrl-alt-del.target 2>/dev/null || true
-        run systemctl restart systemd-logind 2>/dev/null || true
+
+        # NEVER restart systemd-logind. It tears down every session it manages,
+        # so the display manager loses its seat and relaunches the greeter —
+        # the user's whole desktop dies mid-run. From the seat that is
+        # indistinguishable from the machine rebooting. Reload re-reads the
+        # drop-in without touching a single session.
+        if [ "$(systemctl show systemd-logind -p CanReload --value 2>/dev/null)" = yes ]; then
+            run systemctl reload systemd-logind 2>/dev/null \
+                || print_warning "logind reload failed — settings apply at next boot"
+        else
+            print_warning "This systemd's logind cannot reload — settings apply at next boot."
+            print_warning "Deliberately NOT restarting it: that would kill your desktop session."
+        fi
         print_ok "logind: idle lock after ${IDLE_LOCK_SECS}s, lid closes to suspend, Ctrl-Alt-Del masked"
     else
         # No logind: seat/idle policy lives in the display manager or the
