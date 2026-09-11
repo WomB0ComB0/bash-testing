@@ -323,7 +323,17 @@ pkg_install() {
     case "$PKG_FAMILY" in
         debian) run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@" ;;
         rhel)   run sh -c "dnf install -y $* 2>/dev/null || yum install -y $*" ;;
-        arch)   run pacman -S --noconfirm --needed "$@" ;;
+        arch)
+            if ! run pacman -S --noconfirm --needed "$@"; then
+                local broken_deps
+                broken_deps="$(pacman -Sp "$@" 2>&1 | awk '/required by/ {print $NF}' | sort -u | tr '\n' ' ')"
+                if [ -n "$broken_deps" ]; then
+                    print_status "Arch: resolving rolling-release library conflict by including: $broken_deps"
+                    # shellcheck disable=SC2086
+                    run pacman -S --noconfirm --needed "$@" $broken_deps
+                fi
+            fi
+            ;;
         alpine) run apk add --no-cache "$@" ;;
         suse)   run zypper --non-interactive install --no-recommends "$@" ;;
     esac
