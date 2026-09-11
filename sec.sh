@@ -1551,7 +1551,16 @@ setup_usbguard() {
     esac
 
     pkg_has usbguard || pkg_install usbguard
-    pkg_has usbguard || { print_warning "usbguard install failed — skipping"; return 1; }
+    if ! pkg_has usbguard; then
+        if [ "$DRY_RUN" = true ]; then
+            print_dry "usbguard binary not installed yet; would generate policy snapshot from attached devices"
+            print_dry "write /etc/usbguard/usbguard-daemon.conf (default-deny policy)"
+            print_dry "enable and start usbguard.service"
+            return 0
+        fi
+        print_warning "usbguard install failed — skipping"
+        return 1
+    fi
 
     # Lock-out prevention, mirroring the SSH module's philosophy: never cut the
     # channel you are currently using.
