@@ -323,7 +323,7 @@ pkg_install() {
     case "$PKG_FAMILY" in
         debian) run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@" ;;
         rhel)   run sh -c "dnf install -y $* 2>/dev/null || yum install -y $*" ;;
-        arch)   run pacman -Sy --noconfirm --needed "$@" ;;
+        arch)   run pacman -S --noconfirm --needed "$@" ;;
         alpine) run apk add --no-cache "$@" ;;
         suse)   run zypper --non-interactive install --no-recommends "$@" ;;
     esac
