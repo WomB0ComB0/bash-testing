@@ -1506,11 +1506,12 @@ EOF
 usbguard_snapshot() {
     pkg_has usbguard || { print_warning "usbguard not installed — run --usbguard first"; return 1; }
 
-    local tmp
+    local tmp err_file
     tmp="$(mktemp)"
+    err_file="$(mktemp)"
     # -P: no port pinning. Older builds lack the flag; fall back to bare form.
-    if ! usbguard generate-policy -P >"$tmp" 2>/dev/null; then
-        usbguard generate-policy >"$tmp" 2>/dev/null || true
+    if ! usbguard generate-policy -P >"$tmp" 2>"$err_file"; then
+        usbguard generate-policy >"$tmp" 2>"$err_file" || true
     fi
 
     # A policy that failed to enumerate is an empty file. Installing that with
@@ -1518,9 +1519,15 @@ usbguard_snapshot() {
     # so refuse rather than "succeed".
     if ! grep -q '^allow' "$tmp"; then
         rm -f "$tmp"
-        print_warning "generate-policy produced no allow rules — refusing to install an empty default-deny policy"
+        if [ -s "$err_file" ]; then
+            print_warning "usbguard generate-policy failed: $(cat "$err_file" | head -n 2 | tr '\n' ' ')"
+        else
+            print_warning "generate-policy produced no allow rules — refusing to install an empty default-deny policy"
+        fi
+        rm -f "$err_file"
         return 1
     fi
+    rm -f "$err_file"
 
     if [ "$USBGUARD_ALLOW_HID" = true ]; then
         cat >>"$tmp" <<'EOF'
