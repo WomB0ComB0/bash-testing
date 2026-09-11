@@ -88,6 +88,7 @@ DISABLE_SERVICES="${DISABLE_SERVICES:-}"          # CSV of unit names to mask/st
 ENABLE_USBGUARD="${ENABLE_USBGUARD:-false}"           # default-deny USB
 ENABLE_BLUETOOTH_OFF="${ENABLE_BLUETOOTH_OFF:-false}" # stop+mask+blacklist BT
 ENABLE_WIFI_PRIVACY="${ENABLE_WIFI_PRIVACY:-false}"   # NM MAC randomisation
+ETHERNET_CLONED_MAC="${ETHERNET_CLONED_MAC:-preserve}" # preserve|stable|random for wired eth
 ENABLE_MODULE_BLACKLIST="${ENABLE_MODULE_BLACKLIST:-false}"
 ENABLE_KERNEL_CMDLINE="${ENABLE_KERNEL_CMDLINE:-false}" # edits the bootloader
 ENABLE_IDLE_LOCK="${ENABLE_IDLE_LOCK:-false}"         # logind idle/lid lock
@@ -365,6 +366,16 @@ svc_restart() {
     esac
 }
 
+ensure_cron_service() {
+    if [ "$PKG_FAMILY" = "arch" ] && [ "$INIT_SYSTEM" = "systemd" ]; then
+        if ! pkg_has crond && ! pkg_has cronie; then
+            print_status "Arch: installing and enabling cronie for scheduled security tasks"
+            pkg_install cronie
+            svc_enable_now cronie
+        fi
+    fi
+}
+
 # --- Firewall selection ----------------------------------------------------
 
 FIREWALL=""
@@ -372,6 +383,12 @@ FIREWALL=""
 select_firewall() {
     if [ "$FIREWALL_BACKEND" != "auto" ]; then
         FIREWALL="$FIREWALL_BACKEND"
+    elif [ "$INIT_SYSTEM" = systemd ] && systemctl is-active --quiet firewalld 2>/dev/null; then
+        FIREWALL="firewalld"
+    elif [ "$INIT_SYSTEM" = systemd ] && systemctl is-active --quiet ufw 2>/dev/null; then
+        FIREWALL="ufw"
+    elif [ "$INIT_SYSTEM" = systemd ] && systemctl is-active --quiet nftables 2>/dev/null; then
+        FIREWALL="nftables"
     else
         case "$PKG_FAMILY" in
             debian|arch) FIREWALL="ufw" ;;
@@ -667,11 +684,16 @@ setup_fail2ban() {
     pkg_install "$(pkg_name_for fail2ban)" || { print_warning "fail2ban not available"; return 0; }
 
     local jail=/etc/fail2ban/jail.local
-    local logpath
+    local logpath backend
     if [ -n "$AUTH_LOG" ]; then
         logpath="$AUTH_LOG"
+        backend="auto"
+    elif [ "$INIT_SYSTEM" = "systemd" ]; then
+        logpath=""
+        backend="systemd"
     else
         logpath="%(sshd_log)s"
+        backend="auto"
     fi
 
     {
@@ -680,15 +702,15 @@ setup_fail2ban() {
 bantime  = 1h
 findtime = 10m
 maxretry = 5
-backend  = auto
+backend  = $backend
 destemail = $ADMIN_EMAIL
 ignoreip = 127.0.0.1/8 ::1 $LOCAL_NETWORK
 
 [sshd]
 enabled  = true
 port     = $SSH_PORT
-logpath  = $logpath
 EOF
+        [ -n "$logpath" ] && echo "logpath  = $logpath"
     } | write_to "$jail"
 
     svc_enable_now fail2ban
@@ -1054,6 +1076,7 @@ EOF
             # Arch has no separate security channel — patches ship continuously.
             # Provide a download-and-stage cron that does NOT auto-install, so
             # the operator can review breakage before pulling the trigger.
+            ensure_cron_service
             [ -n "$CRON_DAILY" ] || { print_warning "no daily cron dir; skipping"; return 0; }
             run install -d "$CRON_DAILY"
             cat <<'EOF' | write_to "$CRON_DAILY/security-updates"
@@ -1091,6 +1114,7 @@ setup_lynis() {
     [ "$ENABLE_LYNIS" = true ] || { print_status "lynis disabled"; return 0; }
 
     pkg_install lynis || { print_warning "lynis not available"; return 0; }
+    ensure_cron_service
     [ -n "$CRON_WEEKLY" ] || { print_warning "no weekly cron dir on this system; lynis installed but not scheduled"; return 0; }
     run install -d "$CRON_WEEKLY"
     cat <<'EOF' | write_to "$CRON_WEEKLY/lynis-audit"
@@ -1109,6 +1133,7 @@ setup_chkrootkit() {
     [ "$ENABLE_CHKROOTKIT" = true ] || { print_status "chkrootkit disabled"; return 0; }
 
     pkg_install chkrootkit || { print_warning "chkrootkit not available"; return 0; }
+    ensure_cron_service
     [ -n "$CRON_WEEKLY" ] || { print_warning "no weekly cron dir on this system; chkrootkit installed but not scheduled"; return 0; }
     run install -d "$CRON_WEEKLY"
     cat <<'EOF' | write_to "$CRON_WEEKLY/chkrootkit-scan"
@@ -1640,7 +1665,7 @@ setup_wifi_privacy() {
     case "$nm" in
         networkmanager)
             run mkdir -p /etc/NetworkManager/conf.d
-            cat <<'EOF' | write_to /etc/NetworkManager/conf.d/99-mac-randomization.conf
+            cat <<EOF | write_to /etc/NetworkManager/conf.d/99-mac-randomization.conf
 # Managed by linux-security-setup.
 [device-mac-randomization]
 # Randomise the MAC used while scanning, so you are not broadcasting a stable
@@ -1653,11 +1678,11 @@ wifi.scan-rand-mac-address=yes
 # reservations or MAC-based access control on networks you actually use.
 # Use "random" instead for a fresh MAC on every association.
 wifi.cloned-mac-address=stable
-ethernet.cloned-mac-address=stable
+ethernet.cloned-mac-address=${ETHERNET_CLONED_MAC}
 
 [connection]
 # Rotate the stable-id per boot so a single network cannot track you long-term.
-connection.stable-id=${CONNECTION}/${BOOT}
+connection.stable-id=\${CONNECTION}/\${BOOT}
 EOF
             restart_net_stack NetworkManager
             print_ok "NetworkManager MAC randomisation configured (scan: random, per-connection: stable)"
@@ -1928,6 +1953,10 @@ setup_kernel_cmdline() {
         *)       print_status "Secure Boot not enabled — skipping module.sig_enforce=1" ;;
     esac
 
+    if [ "$ENABLE_MAC" = true ] && [ "$PKG_FAMILY" = arch ]; then
+        params+=" lsm=landlock,lockdown,yama,integrity,apparmor,bpf"
+    fi
+
     [ -n "$KERNEL_CMDLINE_EXTRA" ] && params+=" $KERNEL_CMDLINE_EXTRA"
     params="${params# }"
 
@@ -1989,17 +2018,25 @@ setup_kernel_cmdline() {
             ;;
         uki)
             local cfg=/etc/kernel/cmdline
-            print_status "Backup: $(backup_file "$cfg")"
-            if [ "$DRY_RUN" = true ]; then
-                print_dry "append \"$params\" to $cfg"
+            if grep -qF "init_on_alloc=1" "$cfg" 2>/dev/null; then
+                print_status "UKI cmdline already contains hardening parameters — skipping"
             else
-                printf '%s' " $params" >> "$cfg"
+                print_status "Backup: $(backup_file "$cfg")"
+                if [ "$DRY_RUN" = true ]; then
+                    print_dry "append \"$params\" to $cfg"
+                else
+                    if [ -s "$cfg" ] && [ -n "$(tail -c 1 "$cfg" 2>/dev/null)" ] && [ "$(tail -c 1 "$cfg" 2>/dev/null)" != " " ] && [ "$(tail -c 1 "$cfg" 2>/dev/null)" != $'\n' ]; then
+                        printf ' %s\n' "$params" >> "$cfg"
+                    else
+                        printf '%s\n' "$params" >> "$cfg"
+                    fi
+                fi
+                if   pkg_has mkinitcpio;      then run mkinitcpio -P
+                elif pkg_has dracut;          then run dracut --force --regenerate-all
+                elif pkg_has kernel-install;  then print_warning "Re-run kernel-install for each installed kernel"
+                fi
+                print_ok "UKI cmdline updated"
             fi
-            if   pkg_has mkinitcpio;      then run mkinitcpio -P
-            elif pkg_has dracut;          then run dracut --force --regenerate-all
-            elif pkg_has kernel-install;  then print_warning "Re-run kernel-install for each installed kernel"
-            fi
-            print_ok "UKI cmdline updated"
             ;;
         systemd-boot)
             # Entries are per-kernel files with an options= line; there is no
